@@ -22,6 +22,7 @@ namespace CaesarProject
         private TabControl? tabs;
         private TabPage? tab1;
         private TabPage? tab2;
+        private TabPage? tab3;
         private ListBox? lstBatchFiles;
         private Button? btnAddBatch;
         private Button? btnClearBatch;
@@ -49,7 +50,8 @@ namespace CaesarProject
             tabs = new TabControl { Dock = DockStyle.Fill, Appearance = TabAppearance.FlatButtons };
             tab1 = new TabPage { Text = "📝 ТЕКСТ", BackColor = Color.FromArgb(25, 25, 25) };
             tab2 = new TabPage { Text = "📁 ФАЙЛЫ", BackColor = Color.FromArgb(25, 25, 25), AllowDrop = true };
-            tabs.TabPages.AddRange(new TabPage[] { tab1, tab2 });
+            tab3 = new TabPage { Text = "❓ СПРАВКА", BackColor = Color.FromArgb(25, 25, 25) };
+            tabs.TabPages.AddRange(new TabPage[] { tab1, tab2, tab3 });
             this.Controls.Add(tabs);
 
             Font labelFont = new Font("Segoe UI", 10, FontStyle.Regular);
@@ -80,7 +82,7 @@ namespace CaesarProject
 
             tab1.Controls.AddRange(new Control[] { lblTitle, btnFileLoad, lblInput, txtInput, lblShift, numShift, btnEncrypt, btnDecrypt, lblResult, txtOutput, btnCopy, btnFileSave });
 
-            // --- ВКЛАДКА 2: ПАКЕТНАЯ ОБРАБОТКА (ОБНОВЛЕНО ПО СКРИНШОТУ) ---
+            // --- ВКЛАДКА 2: ПАКЕТНАЯ ОБРАБОТКА ---
             Label lblBatchTitle = new Label { Text = "ОБРАБОТКА ФАЙЛОВ", ForeColor = Color.FromArgb(0, 200, 150), Font = new Font("Segoe UI Semibold", 18, FontStyle.Bold), AutoSize = true, Location = new Point(25, 15) };
             
             lstBatchFiles = new ListBox { Location = new Point(25, 65), Size = new Size(395, 300), BackColor = Color.FromArgb(35, 35, 35), ForeColor = Color.White, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Segoe UI", 9), AllowDrop = true };
@@ -100,6 +102,58 @@ namespace CaesarProject
             Label lblInfo = new Label { Text = "Файлы (txt/docx) будут перезаписаны новым текстом.", ForeColor = Color.Gray, Location = new Point(25, 550), AutoSize = true, Font = new Font("Segoe UI", 8) };
 
             tab2.Controls.AddRange(new Control[] { lblBatchTitle, lstBatchFiles, lblBatchShift, numBatchShift, btnAddBatch, btnClearBatch, btnProcessBatch, lblInfo });
+
+            // --- ВКЛАДКА 3: СПРАВКА ---
+            Label lblHelpTitle = new Label
+            {
+                Text = "СПРАВКА",
+                ForeColor = Color.FromArgb(255, 180, 0),
+                Font = new Font("Segoe UI Semibold", 20, FontStyle.Bold),
+                AutoSize = true,
+                Location = new Point(25, 15)
+            };
+
+            RichTextBox rtbHelp = new RichTextBox
+            {
+                Location = new Point(25, 65),
+                Size = new Size(395, 530),
+                BackColor = Color.FromArgb(35, 35, 35),
+                ForeColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle,
+                Font = new Font("Segoe UI", 10),
+                ReadOnly = true,
+                ScrollBars = RichTextBoxScrollBars.Vertical,
+                Text =
+                    "📝 ВКЛАДКА «ТЕКСТ»\r\n" +
+                    "─────────────────────────────\r\n" +
+                    "• Загрузить (TXT/DOCX) — загружает текст из файла в поле «Исходный текст».\r\n\r\n" +
+                    "• Исходный текст — введите или вставьте текст, который нужно зашифровать или расшифровать.\r\n\r\n" +
+                    "• Ключ сдвига — число от -25 до 25, на которое сдвигаются буквы алфавита. " +
+                    "Положительное значение — сдвиг вправо (шифрование), отрицательное — влево.\r\n\r\n" +
+                    "• ЗАШИФРОВАТЬ — применяет шифр Цезаря с указанным сдвигом.\r\n\r\n" +
+                    "• РАСШИФРОВАТЬ — применяет обратный сдвиг для дешифровки текста.\r\n\r\n" +
+                    "• Результат — здесь отображается обработанный текст.\r\n\r\n" +
+                    "• КОПИРОВАТЬ В БУФЕР — копирует результат в буфер обмена.\r\n\r\n" +
+                    "• СОХРАНИТЬ В ФАЙЛ — сохраняет результат в файл формата TXT или DOCX.\r\n\r\n\r\n" +
+                    "📁 ВКЛАДКА «ФАЙЛЫ»\r\n" +
+                    "─────────────────────────────\r\n" +
+                    "• Список файлов — отображает файлы, добавленные для пакетной обработки. " +
+                    "Файлы можно перетащить прямо в список (drag & drop).\r\n\r\n" +
+                    "• Ключ сдвига — сдвиг, который будет применён ко всем файлам.\r\n\r\n" +
+                    "• ДОБАВИТЬ — открывает диалог выбора одного или нескольких файлов (TXT/DOCX).\r\n\r\n" +
+                    "• ОЧИСТИТЬ — удаляет все файлы из списка.\r\n\r\n" +
+                    "• НАЧАТЬ ОБРАБОТКУ — шифрует все файлы из списка. " +
+                    "Внимание: содержимое файлов будет перезаписано!\r\n\r\n\r\n" +
+                    "ℹ️ О ШИФРЕ ЦЕЗАРЯ\r\n" +
+                    "─────────────────────────────\r\n" +
+                    "Шифр Цезаря — один из древнейших методов шифрования. " +
+                    "Каждая буква заменяется буквой, стоящей на N позиций дальше в алфавите. " +
+                    "Поддерживаются латинский и русский алфавиты. " +
+                    "Прочие символы (цифры, знаки препинания) не изменяются.\r\n\r\n" +
+                    "Пример (сдвиг 3): А → Г, B → E, Hello → Khoor"
+            };
+
+            tab3.Controls.AddRange(new Control[] { lblHelpTitle, rtbHelp });
 
             // --- ЛОГИКА СОБЫТИЙ ---
             tab2.DragEnter += (s, e) => { if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effect = DragDropEffects.Copy; };
