@@ -4,13 +4,12 @@ using System.IO;
 using System.Windows.Forms;
 using System.Text;
 using System.Collections.Generic;
-using Xceed.Words.NET; // НЕОБХОДИМО: NuGet пакет DocX
+using Xceed.Words.NET;
 
 namespace CaesarProject
 {
     public partial class Form1 : Form
     {
-        // --- ЭЛЕМЕНТЫ УПРАВЛЕНИЯ ---
         private TextBox? txtInput;
         private TextBox? txtOutput;
         private NumericUpDown? numShift;
@@ -38,7 +37,6 @@ namespace CaesarProject
 
         private void InitializeCustomComponents()
         {
-            // --- НАСТРОЙКИ ОКНА ---
             this.Text = "Caesar Cipher Premium v2.0 (Word Support)";
             this.Size = new Size(460, 730);
             this.StartPosition = FormStartPosition.CenterScreen;
@@ -46,7 +44,6 @@ namespace CaesarProject
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
 
-            // --- СИСТЕМА ВКЛАДОК ---
             tabs = new TabControl { Dock = DockStyle.Fill, Appearance = TabAppearance.FlatButtons };
             tab1 = new TabPage { Text = "📝 ТЕКСТ", BackColor = Color.FromArgb(25, 25, 25) };
             tab2 = new TabPage { Text = "📁 ФАЙЛЫ", BackColor = Color.FromArgb(25, 25, 25), AllowDrop = true };
@@ -56,51 +53,36 @@ namespace CaesarProject
 
             Font labelFont = new Font("Segoe UI", 10, FontStyle.Regular);
 
-            // --- ВКЛАДКА 1: РАБОТА С ТЕКСТОМ ---
+            // --- ВКЛАДКА 1 ---
             Label lblTitle = new Label { Text = "ШИФР ЦЕЗАРЯ", ForeColor = Color.FromArgb(0, 150, 255), Font = new Font("Segoe UI Semibold", 20, FontStyle.Bold), AutoSize = true, Location = new Point(25, 15) };
-            
             btnFileLoad = CreateStyledButton("📥 ЗАГРУЗИТЬ (TXT/DOCX)", new Point(25, 70), Color.FromArgb(100, 45, 140));
             btnFileLoad.Size = new Size(395, 40);
-
             Label lblInput = new Label { Text = "Исходный текст:", ForeColor = Color.DarkGray, Font = labelFont, Location = new Point(25, 120), AutoSize = true };
             txtInput = new TextBox { Multiline = true, Location = new Point(25, 145), Size = new Size(395, 100), BackColor = Color.FromArgb(35, 35, 35), ForeColor = Color.White, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Consolas", 11), ScrollBars = ScrollBars.Vertical };
-
             Label lblShift = new Label { Text = "Ключ сдвига:", ForeColor = Color.DarkGray, Font = labelFont, Location = new Point(25, 260), AutoSize = true };
             numShift = new NumericUpDown { Location = new Point(145, 258), Width = 80, Minimum = -25, Maximum = 25, Value = 3, BackColor = Color.FromArgb(35, 35, 35), ForeColor = Color.White, BorderStyle = BorderStyle.FixedSingle, TextAlign = HorizontalAlignment.Center };
-
             btnEncrypt = CreateStyledButton("ЗАШИФРОВАТЬ", new Point(25, 300), Color.FromArgb(0, 110, 210));
             btnDecrypt = CreateStyledButton("РАСШИФРОВАТЬ", new Point(230, 300), Color.FromArgb(40, 130, 40));
-
             Label lblResult = new Label { Text = "Результат:", ForeColor = Color.DarkGray, Font = labelFont, Location = new Point(25, 360), AutoSize = true };
             txtOutput = new TextBox { Multiline = true, ReadOnly = true, Location = new Point(25, 385), Size = new Size(395, 100), BackColor = Color.FromArgb(35, 35, 35), ForeColor = Color.White, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Consolas", 11), ScrollBars = ScrollBars.Vertical };
-
             btnCopy = CreateStyledButton("КОПИРОВАТЬ В БУФЕР", new Point(25, 505), Color.FromArgb(60, 60, 60));
             btnCopy.Size = new Size(395, 45);
-
             btnFileSave = CreateStyledButton("💾 СОХРАНИТЬ В ФАЙЛ", new Point(25, 560), Color.FromArgb(45, 45, 45));
             btnFileSave.Size = new Size(395, 45);
-
             tab1.Controls.AddRange(new Control[] { lblTitle, btnFileLoad, lblInput, txtInput, lblShift, numShift, btnEncrypt, btnDecrypt, lblResult, txtOutput, btnCopy, btnFileSave });
 
-            // --- ВКЛАДКА 2: ПАКЕТНАЯ ОБРАБОТКА ---
+            // --- ВКЛАДКА 2 ---
             Label lblBatchTitle = new Label { Text = "ОБРАБОТКА ФАЙЛОВ", ForeColor = Color.FromArgb(0, 200, 150), Font = new Font("Segoe UI Semibold", 18, FontStyle.Bold), AutoSize = true, Location = new Point(25, 15) };
-            
             lstBatchFiles = new ListBox { Location = new Point(25, 65), Size = new Size(395, 300), BackColor = Color.FromArgb(35, 35, 35), ForeColor = Color.White, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Segoe UI", 9), AllowDrop = true };
-
             Label lblBatchShift = new Label { Text = "Ключ сдвига:", ForeColor = Color.DarkGray, Font = labelFont, Location = new Point(25, 380), AutoSize = true };
             numBatchShift = new NumericUpDown { Location = new Point(140, 378), Width = 80, Minimum = -25, Maximum = 25, Value = 3, BackColor = Color.FromArgb(35, 35, 35), ForeColor = Color.White, BorderStyle = BorderStyle.FixedSingle, TextAlign = HorizontalAlignment.Center };
-
             btnAddBatch = CreateStyledButton("➕ ДОБАВИТЬ", new Point(25, 420), Color.FromArgb(100, 45, 140));
             btnAddBatch.Size = new Size(192, 45);
-
             btnClearBatch = CreateStyledButton("🗑 ОЧИСТИТЬ", new Point(228, 420), Color.FromArgb(80, 40, 40));
             btnClearBatch.Size = new Size(192, 45);
-
             btnProcessBatch = CreateStyledButton("🚀 НАЧАТЬ ОБРАБОТКУ", new Point(25, 480), Color.FromArgb(0, 110, 210));
             btnProcessBatch.Size = new Size(395, 60);
-
             Label lblInfo = new Label { Text = "Файлы (txt/docx) будут перезаписаны новым текстом.", ForeColor = Color.Gray, Location = new Point(25, 550), AutoSize = true, Font = new Font("Segoe UI", 8) };
-
             tab2.Controls.AddRange(new Control[] { lblBatchTitle, lstBatchFiles, lblBatchShift, numBatchShift, btnAddBatch, btnClearBatch, btnProcessBatch, lblInfo });
 
             // --- ВКЛАДКА 3: СПРАВКА ---
@@ -125,37 +107,42 @@ namespace CaesarProject
                 ScrollBars = RichTextBoxScrollBars.Vertical,
                 Text =
                     "📝 ВКЛАДКА «ТЕКСТ»\r\n" +
-                    "─────────────────────────────\r\n" +
-                    "• Загрузить (TXT/DOCX) — загружает текст из файла в поле «Исходный текст».\r\n\r\n" +
-                    "• Исходный текст — введите или вставьте текст, который нужно зашифровать или расшифровать.\r\n\r\n" +
-                    "• Ключ сдвига — число от -25 до 25, на которое сдвигаются буквы алфавита. " +
-                    "Положительное значение — сдвиг вправо (шифрование), отрицательное — влево.\r\n\r\n" +
-                    "• ЗАШИФРОВАТЬ — применяет шифр Цезаря с указанным сдвигом.\r\n\r\n" +
-                    "• РАСШИФРОВАТЬ — применяет обратный сдвиг для дешифровки текста.\r\n\r\n" +
-                    "• Результат — здесь отображается обработанный текст.\r\n\r\n" +
-                    "• КОПИРОВАТЬ В БУФЕР — копирует результат в буфер обмена.\r\n\r\n" +
-                    "• СОХРАНИТЬ В ФАЙЛ — сохраняет результат в файл формата TXT или DOCX.\r\n\r\n\r\n" +
+                    "------------------------------\r\n" +
+                    "• Загрузить — загружает текст из файла TXT или DOCX.\r\n\r\n" +
+                    "• Ключ сдвига — число от -25 до 25, на которое сдвигаются буквы.\r\n\r\n" +
+                    "• ЗАШИФРОВАТЬ / РАСШИФРОВАТЬ — применяет шифр к тексту.\r\n\r\n" +
+                    "• КОПИРОВАТЬ — копирует результат в буфер обмена.\r\n\r\n" +
+                    "• СОХРАНИТЬ — сохраняет результат в файл TXT или DOCX.\r\n\r\n\r\n" +
                     "📁 ВКЛАДКА «ФАЙЛЫ»\r\n" +
-                    "─────────────────────────────\r\n" +
-                    "• Список файлов — отображает файлы, добавленные для пакетной обработки. " +
-                    "Файлы можно перетащить прямо в список (drag & drop).\r\n\r\n" +
-                    "• Ключ сдвига — сдвиг, который будет применён ко всем файлам.\r\n\r\n" +
-                    "• ДОБАВИТЬ — открывает диалог выбора одного или нескольких файлов (TXT/DOCX).\r\n\r\n" +
-                    "• ОЧИСТИТЬ — удаляет все файлы из списка.\r\n\r\n" +
-                    "• НАЧАТЬ ОБРАБОТКУ — шифрует все файлы из списка. " +
-                    "Внимание: содержимое файлов будет перезаписано!\r\n\r\n\r\n" +
+                    "------------------------------\r\n" +
+                    "• Добавьте файлы TXT/DOCX (или перетащите их в список).\r\n\r\n" +
+                    "• Укажите ключ сдвига и нажмите «НАЧАТЬ ОБРАБОТКУ».\r\n\r\n" +
+                    "• Внимание: содержимое файлов будет перезаписано!\r\n\r\n\r\n" +
+                    "💻 КОНСОЛЬНЫЙ РЕЖИМ\r\n" +
+                    "------------------------------\r\n" +
+                    "1. Открой PowerShell или cmd.\r\n\r\n" +
+                    "2. Укажи путь к программе:\r\n" +
+                    "   cd \"C:\\путь\\до\\папки\\с\\программой\"\r\n\r\n" +
+                    "3. Зашифровать текст:\r\n" +
+                    "   .\\CaesarProject.exe e 3 \"Hello\"  ->  Khoor\r\n\r\n" +
+                    "4. Расшифровать текст:\r\n" +
+                    "   .\\CaesarProject.exe d 3 \"Khoor\"  ->  Hello\r\n\r\n" +
+                    "5. Зашифровать файл (файл будет перезаписан):\r\n" +
+                    "   .\\CaesarProject.exe e 3 \"C:\\docs\\file.txt\"\r\n\r\n" +
+                    "6. Расшифровать файл:\r\n" +
+                    "   .\\CaesarProject.exe d 3 \"C:\\docs\\file.txt\"\r\n\r\n" +
+                    "e — зашифровать, d — расшифровать.\r\n\r\n\r\n" +
                     "ℹ️ О ШИФРЕ ЦЕЗАРЯ\r\n" +
-                    "─────────────────────────────\r\n" +
-                    "Шифр Цезаря — один из древнейших методов шифрования. " +
-                    "Каждая буква заменяется буквой, стоящей на N позиций дальше в алфавите. " +
-                    "Поддерживаются латинский и русский алфавиты. " +
-                    "Прочие символы (цифры, знаки препинания) не изменяются.\r\n\r\n" +
-                    "Пример (сдвиг 3): А → Г, B → E, Hello → Khoor"
+                    "------------------------------\r\n" +
+                    "Каждая буква заменяется буквой на N позиций дальше в алфавите.\r\n" +
+                    "Поддерживаются латинский и русский алфавиты.\r\n" +
+                    "Цифры и знаки препинания не изменяются.\r\n\r\n" +
+                    "Пример (сдвиг 3): А -> Г, B -> E, Hello -> Khoor"
             };
 
             tab3.Controls.AddRange(new Control[] { lblHelpTitle, rtbHelp });
 
-            // --- ЛОГИКА СОБЫТИЙ ---
+            // --- СОБЫТИЯ ---
             tab2.DragEnter += (s, e) => { if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effect = DragDropEffects.Copy; };
             tab2.DragDrop += (s, e) => HandleFileDrop(e);
             lstBatchFiles.DragEnter += (s, e) => { if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effect = DragDropEffects.Copy; };
@@ -166,17 +153,15 @@ namespace CaesarProject
 
             btnFileLoad.Click += (s, e) => {
                 OpenFileDialog ofd = new OpenFileDialog { Filter = fileFilter };
-                if (ofd.ShowDialog() == DialogResult.OK && txtInput != null) {
+                if (ofd.ShowDialog() == DialogResult.OK && txtInput != null)
                     txtInput.Text = SmartRead(ofd.FileName);
-                }
             };
 
             btnFileSave.Click += (s, e) => {
                 if (txtOutput == null || string.IsNullOrEmpty(txtOutput.Text)) return;
                 SaveFileDialog sfd = new SaveFileDialog { Filter = fileFilter };
-                if (sfd.ShowDialog() == DialogResult.OK) {
+                if (sfd.ShowDialog() == DialogResult.OK)
                     SmartSave(sfd.FileName, txtOutput.Text);
-                }
             };
 
             btnCopy.Click += (s, e) => {
@@ -191,10 +176,9 @@ namespace CaesarProject
 
             btnAddBatch.Click += (s, e) => {
                 OpenFileDialog ofd = new OpenFileDialog { Filter = fileFilter, Multiselect = true };
-                if (ofd.ShowDialog() == DialogResult.OK && lstBatchFiles != null) {
+                if (ofd.ShowDialog() == DialogResult.OK && lstBatchFiles != null)
                     foreach (string f in ofd.FileNames)
                         if (!lstBatchFiles.Items.Contains(f)) lstBatchFiles.Items.Add(f);
-                }
             };
 
             btnClearBatch.Click += (s, e) => lstBatchFiles?.Items.Clear();
@@ -217,7 +201,6 @@ namespace CaesarProject
             };
         }
 
-        // --- МЕТОДЫ ДЛЯ WORD И ТЕКСТА ---
         private string SmartRead(string path) {
             string ext = Path.GetExtension(path).ToLower();
             if (ext == ".docx") {
@@ -243,9 +226,8 @@ namespace CaesarProject
             string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
             foreach (string f in files) {
                 string ext = Path.GetExtension(f).ToLower();
-                if ((ext == ".txt" || ext == ".docx") && !lstBatchFiles.Items.Contains(f)) {
+                if ((ext == ".txt" || ext == ".docx") && !lstBatchFiles.Items.Contains(f))
                     lstBatchFiles.Items.Add(f);
-                }
             }
         }
 
