@@ -1,38 +1,33 @@
-﻿namespace CaesarProject;
+using System;
+using System.Text;
 
-partial class Form1
+namespace CaesarProject
 {
     /// <summary>
-    ///  Required designer variable.
+    /// Общий класс шифра Цезаря.
+    /// Вынесен сюда, чтобы не дублировать логику в Form1.cs и Program.cs.
     /// </summary>
-    private System.ComponentModel.IContainer components = null;
-
-    /// <summary>
-    ///  Clean up any resources being used.
-    /// </summary>
-    /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
-    protected override void Dispose(bool disposing)
+    public static class CaesarCipher
     {
-        if (disposing && (components != null))
+        /// <summary>
+        /// Применяет шифр Цезаря к строке.
+        /// Поддерживает латиницу, кириллицу (без ё/Ё), цифры и знаки препинания.
+        /// Неизвестные символы пропускаются без изменений.
+        /// </summary>
+        public static string Apply(string input, int shift)
         {
-            components.Dispose();
+            if (string.IsNullOrEmpty(input)) return string.Empty;
+
+            StringBuilder res = new StringBuilder();
+            foreach (char c in input)
+            {
+                if      (c >= 'a' && c <= 'z') res.Append((char)('a' + (c - 'a' + (shift % 26) + 26) % 26));
+                else if (c >= 'A' && c <= 'Z') res.Append((char)('A' + (c - 'A' + (shift % 26) + 26) % 26));
+                else if (c >= 'а' && c <= 'я') res.Append((char)('а' + (c - 'а' + (shift % 32) + 32) % 32));
+                else if (c >= 'А' && c <= 'Я') res.Append((char)('А' + (c - 'А' + (shift % 32) + 32) % 32));
+                else res.Append(c); // цифры, пробелы, пунктуация, ё/Ё и прочее — без изменений
+            }
+            return res.ToString();
         }
-        base.Dispose(disposing);
     }
-
-    #region Windows Form Designer generated code
-
-    /// <summary>
-    ///  Required method for Designer support - do not modify
-    ///  the contents of this method with the code editor.
-    /// </summary>
-    private void InitializeComponent()
-    {
-        components = new System.ComponentModel.Container();
-        AutoScaleMode = AutoScaleMode.Font;
-        ClientSize = new Size(800, 450);
-        Text = "Form1";
-    }
-
-    #endregion
 }
