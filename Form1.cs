@@ -28,6 +28,7 @@ namespace CaesarProject
         private Button? btnClearBatch;
         private Button? btnProcessBatch;
         private NumericUpDown? numBatchShift;
+        private ComboBox? cmbBatchMode;
 
         private string fileFilter = "Все поддерживаемые|*.txt;*.docx|Текстовые файлы (*.txt)|*.txt|Документы Word (*.docx)|*.docx";
 
@@ -93,6 +94,19 @@ namespace CaesarProject
 
             Label lblBatchShift = new Label { Text = "Ключ сдвига:", ForeColor = Color.DarkGray, Font = labelFont, Location = new Point(25, 380), AutoSize = true };
             numBatchShift = new NumericUpDown { Location = new Point(140, 378), Width = 80, Minimum = -25, Maximum = 25, Value = 3, BackColor = Color.FromArgb(35, 35, 35), ForeColor = Color.White, BorderStyle = BorderStyle.FixedSingle, TextAlign = HorizontalAlignment.Center };
+            // Выпадающий список выбора режима
+            cmbBatchMode = new ComboBox
+            {
+                Location = new Point(235, 378),
+                Size = new Size(185, 30),
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = Color.FromArgb(35, 35, 35),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9, FontStyle.Bold)
+            };
+            cmbBatchMode.Items.AddRange(new string[] { "🔐 ЗАШИФРОВАТЬ", "🔓 РАСШИФРОВАТЬ" });
+            cmbBatchMode.SelectedIndex = 0; 
 
             btnAddBatch = CreateStyledButton("➕ ДОБАВИТЬ", new Point(25, 420), Color.FromArgb(100, 45, 140));
             btnAddBatch.Size = new Size(192, 45);
@@ -105,7 +119,8 @@ namespace CaesarProject
 
             Label lblInfo = new Label { Text = "Файлы (txt/docx) будут перезаписаны новым текстом.", ForeColor = Color.Gray, Location = new Point(25, 550), AutoSize = true, Font = new Font("Segoe UI", 8) };
 
-            tab2.Controls.AddRange(new Control[] { lblBatchTitle, lstBatchFiles, lblBatchShift, numBatchShift, btnAddBatch, btnClearBatch, btnProcessBatch, lblInfo });
+           tab2.Controls.AddRange(new Control[] { lblBatchTitle, lstBatchFiles, lblBatchShift, numBatchShift, cmbBatchMode, btnAddBatch, btnClearBatch, btnProcessBatch, lblInfo });
+
 
             // ВКЛАДКА 3
             Label HelpTitle = new Label
@@ -298,11 +313,16 @@ namespace CaesarProject
                 try
                 {
                     int shift = (int)numBatchShift.Value;
+                    if (cmbBatchMode != null && cmbBatchMode.SelectedIndex == 1) 
+                    {
+                        shift = -shift;
+                    }
                     foreach (string path in lstBatchFiles.Items)
                     {
                         string content = SmartRead(path);
                         SmartSave(path, CaesarCipher.Apply(content, shift));
                     }
+
                     MessageBox.Show($"Готово! Все файлы обработаны с шагом {shift}.");
                     lstBatchFiles.Items.Clear();
                 }
