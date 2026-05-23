@@ -37,9 +37,153 @@ namespace CaesarProject
             InitializeCustomComponents();
         }
 
+        // ─────────────────────────────────────────────────────────────
+        //  Проверка: является ли файл настоящим ZIP/DOCX
+        // ─────────────────────────────────────────────────────────────
+        private bool IsValidDocx(string path)
+        {
+            try
+            {
+                // DOCX — это ZIP. Первые 4 байта: 50 4B 03 04
+                byte[] header = new byte[4];
+                using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read))
+                {
+                    if (fs.Length < 4) return false;
+                    fs.Read(header, 0, 4);
+                }
+                return header[0] == 0x50 && header[1] == 0x4B
+                    && header[2] == 0x03 && header[3] == 0x04;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        //  Чтение файла (TXT или DOCX)
+        // ─────────────────────────────────────────────────────────────
+        private string SmartRead(string path)
+        {
+            string ext = Path.GetExtension(path).ToLower();
+
+            if (ext == ".docx")
+            {
+                // Сначала проверяем подпись ZIP
+                if (!IsValidDocx(path))
+                {
+                    // Файл не является настоящим DOCX — пробуем прочитать как текст
+                    try
+                    {
+                        return File.ReadAllText(path, Encoding.UTF8);
+                    }
+                    catch
+                    {
+                        throw new InvalidDataException(
+                            "Файл имеет расширение .docx, но не является корректным документом Word.\n" +
+                            "Возможно, файл повреждён или это переименованный TXT-файл.");
+                    }
+                }
+
+                // Файл корректный — читаем через Xceed
+                try
+                {
+                    using (DocX doc = DocX.Load(path))
+                    {
+                        StringBuilder sb = new StringBuilder();
+                        foreach (var para in doc.Paragraphs)
+                            sb.AppendLine(para.Text);
+
+                        // Убираем нулевые байты и другие недопустимые XML-символы
+                        return RemoveInvalidXmlChars(sb.ToString());
+                    }
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidDataException(
+                        "Не удалось открыть DOCX-файл.\n" +
+                        "Детали: " + ex.Message);
+                }
+            }
+
+            // TXT и любые другие расширения
+            return File.ReadAllText(path, Encoding.UTF8);
+        }
+        private string RemoveInvalidXmlChars(string text)
+        {
+            StringBuilder result = new StringBuilder();
+            foreach (char c in text)
+            {
+                if (c == 0x09 || c == 0x0A || c == 0x0D ||
+                    (c >= 0x20 && c <= 0xD7FF) ||
+                    (c >= 0xE000 && c <= 0xFFFD))
+                {
+                    result.Append(c);
+                }
+            }
+            return result.ToString();
+        }
+        //  Сохранение файла (TXT или DOCX)
+        private void SmartSave(string path, string content)
+        {
+            content = RemoveInvalidXmlChars(content);
+            string ext = Path.GetExtension(path).ToLower();
+
+            if (ext == ".docx")
+            {
+                using (DocX doc = DocX.Create(path))
+                {
+                    string[] lines = content.Split(
+                        new[] { "\r\n", "\n" },
+                        StringSplitOptions.None);
+
+                    for (int i = 0; i < lines.Length; i++)
+                    {
+                        if (i == lines.Length - 1 && string.IsNullOrEmpty(lines[i]))
+                            break;
+
+                        doc.InsertParagraph(lines[i]);
+                    }
+
+                    doc.Save();
+                }
+            }
+            else
+            {
+                File.WriteAllText(path, content, Encoding.UTF8);
+            }
+        }
+        //  Drag-and-drop для вкладки «Файлы»
+        private void HandleFileDrop(DragEventArgs e)
+        {
+            if (lstBatchFiles == null) return;
+            string[] files = (string[])e.Data!.GetData(DataFormats.FileDrop);
+            foreach (string f in files)
+            {
+                string ext = Path.GetExtension(f).ToLower();
+                if ((ext == ".txt" || ext == ".docx") && !lstBatchFiles.Items.Contains(f))
+                    lstBatchFiles.Items.Add(f);
+            }
+        }
+
+        //  Вспомогательный метод создания кнопки
+        private Button CreateStyledButton(string text, Point location, Color bgColor)
+        {
+            return new Button
+            {
+                Text = text,
+                Location = location,
+                Size = new Size(190, 45),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = bgColor,
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+        }
+        //  Построение интерфейса
         private void InitializeCustomComponents()
         {
-            // Настройки окна
             this.Text = "Caesar Cipher Premium v1.0";
             this.Size = new Size(460, 730);
             this.StartPosition = FormStartPosition.CenterScreen;
@@ -47,34 +191,95 @@ namespace CaesarProject
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
 
-            // Названия и параметры вкладок
             tabs = new TabControl { Dock = DockStyle.Fill, Appearance = TabAppearance.FlatButtons };
-            tab1 = new TabPage { Text = "📝 ТЕКСТ", BackColor = Color.FromArgb(25, 25, 25) };
-            tab2 = new TabPage { Text = "📁 ФАЙЛЫ", BackColor = Color.FromArgb(25, 25, 25), AllowDrop = true };
+            tab1 = new TabPage { Text = "📝 ТЕКСТ",   BackColor = Color.FromArgb(25, 25, 25) };
+            tab2 = new TabPage { Text = "📁 ФАЙЛЫ",   BackColor = Color.FromArgb(25, 25, 25), AllowDrop = true };
             tab3 = new TabPage { Text = "❓ СПРАВКА", BackColor = Color.FromArgb(25, 25, 25) };
             tabs.TabPages.AddRange(new TabPage[] { tab1, tab2, tab3 });
             this.Controls.Add(tabs);
 
-            // Шрифт
             Font labelFont = new Font("Segoe UI", 10, FontStyle.Regular);
 
-            // ВКЛАДКА 1
-            Label lblTitle = new Label { Text = "ШИФР ЦЕЗАРЯ", ForeColor = Color.FromArgb(0, 150, 255), Font = new Font("Segoe UI Semibold", 20, FontStyle.Bold), AutoSize = true, Location = new Point(25, 15) };
+            //  ВКЛАДКА 1 
+            Label lblTitle = new Label
+            {
+                Text = "ШИФР ЦЕЗАРЯ",
+                ForeColor = Color.FromArgb(0, 150, 255),
+                Font = new Font("Segoe UI Semibold", 20, FontStyle.Bold),
+                AutoSize = true,
+                Location = new Point(25, 15)
+            };
 
             btnFileLoad = CreateStyledButton("📥 ЗАГРУЗИТЬ (TXT/DOCX)", new Point(25, 70), Color.FromArgb(100, 45, 140));
             btnFileLoad.Size = new Size(395, 40);
 
-            Label lblInput = new Label { Text = "Исходный текст:", ForeColor = Color.DarkGray, Font = labelFont, Location = new Point(25, 120), AutoSize = true };
-            txtInput = new TextBox { Multiline = true, Location = new Point(25, 145), Size = new Size(395, 100), BackColor = Color.FromArgb(35, 35, 35), ForeColor = Color.White, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Consolas", 11), ScrollBars = ScrollBars.Vertical };
+            Label lblInput = new Label
+            {
+                Text = "Исходный текст:",
+                ForeColor = Color.DarkGray,
+                Font = labelFont,
+                Location = new Point(25, 120),
+                AutoSize = true
+            };
 
-            Label lblShift = new Label { Text = "Ключ сдвига:", ForeColor = Color.DarkGray, Font = labelFont, Location = new Point(25, 260), AutoSize = true };
-            numShift = new NumericUpDown { Location = new Point(145, 258), Width = 80, Minimum = -25, Maximum = 25, Value = 3, BackColor = Color.FromArgb(35, 35, 35), ForeColor = Color.White, BorderStyle = BorderStyle.FixedSingle, TextAlign = HorizontalAlignment.Center };
+            txtInput = new TextBox
+            {
+                Multiline = true,
+                Location = new Point(25, 145),
+                Size = new Size(395, 100),
+                BackColor = Color.FromArgb(35, 35, 35),
+                ForeColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle,
+                Font = new Font("Consolas", 11),
+                ScrollBars = ScrollBars.Vertical
+            };
+
+            Label lblShift = new Label
+            {
+                Text = "Ключ сдвига:",
+                ForeColor = Color.DarkGray,
+                Font = labelFont,
+                Location = new Point(25, 260),
+                AutoSize = true
+            };
+
+            numShift = new NumericUpDown
+            {
+                Location = new Point(145, 258),
+                Width = 80,
+                Minimum = -25,
+                Maximum = 25,
+                Value = 3,
+                BackColor = Color.FromArgb(35, 35, 35),
+                ForeColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle,
+                TextAlign = HorizontalAlignment.Center
+            };
 
             btnEncrypt = CreateStyledButton("ЗАШИФРОВАТЬ", new Point(25, 300), Color.FromArgb(0, 110, 210));
             btnDecrypt = CreateStyledButton("РАСШИФРОВАТЬ", new Point(230, 300), Color.FromArgb(40, 130, 40));
 
-            Label lblResult = new Label { Text = "Результат:", ForeColor = Color.DarkGray, Font = labelFont, Location = new Point(25, 360), AutoSize = true };
-            txtOutput = new TextBox { Multiline = true, ReadOnly = true, Location = new Point(25, 385), Size = new Size(395, 100), BackColor = Color.FromArgb(35, 35, 35), ForeColor = Color.White, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Consolas", 11), ScrollBars = ScrollBars.Vertical };
+            Label lblResult = new Label
+            {
+                Text = "Результат:",
+                ForeColor = Color.DarkGray,
+                Font = labelFont,
+                Location = new Point(25, 360),
+                AutoSize = true
+            };
+
+            txtOutput = new TextBox
+            {
+                Multiline = true,
+                ReadOnly = true,
+                Location = new Point(25, 385),
+                Size = new Size(395, 100),
+                BackColor = Color.FromArgb(35, 35, 35),
+                ForeColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle,
+                Font = new Font("Consolas", 11),
+                ScrollBars = ScrollBars.Vertical
+            };
 
             btnCopy = CreateStyledButton("КОПИРОВАТЬ В БУФЕР", new Point(25, 505), Color.FromArgb(60, 60, 60));
             btnCopy.Size = new Size(310, 45);
@@ -86,15 +291,56 @@ namespace CaesarProject
             btnClear.Size = new Size(70, 100);
             btnClear.Font = new Font("Segoe UI Emoji", 12, FontStyle.Regular);
 
-            tab1.Controls.AddRange(new Control[] { lblTitle, btnFileLoad, lblInput, txtInput, lblShift, numShift, btnEncrypt, btnDecrypt, lblResult, txtOutput, btnCopy, btnFileSave, btnClear });
+            tab1.Controls.AddRange(new Control[]
+            {
+                lblTitle, btnFileLoad, lblInput, txtInput,
+                lblShift, numShift, btnEncrypt, btnDecrypt,
+                lblResult, txtOutput, btnCopy, btnFileSave, btnClear
+            });
 
-            // ВКЛАДКА 2
-            Label lblBatchTitle = new Label { Text = "ОБРАБОТКА ФАЙЛОВ", ForeColor = Color.FromArgb(0, 200, 150), Font = new Font("Segoe UI Semibold", 18, FontStyle.Bold), AutoSize = true, Location = new Point(25, 15) };
-            lstBatchFiles = new ListBox { Location = new Point(25, 65), Size = new Size(395, 300), BackColor = Color.FromArgb(35, 35, 35), ForeColor = Color.White, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Segoe UI", 9), AllowDrop = true };
+            //  ВКЛАДКА 2 
+            Label lblBatchTitle = new Label
+            {
+                Text = "ОБРАБОТКА ФАЙЛОВ",
+                ForeColor = Color.FromArgb(0, 200, 150),
+                Font = new Font("Segoe UI Semibold", 18, FontStyle.Bold),
+                AutoSize = true,
+                Location = new Point(25, 15)
+            };
 
-            Label lblBatchShift = new Label { Text = "Ключ сдвига:", ForeColor = Color.DarkGray, Font = labelFont, Location = new Point(25, 380), AutoSize = true };
-            numBatchShift = new NumericUpDown { Location = new Point(140, 378), Width = 80, Minimum = -25, Maximum = 25, Value = 3, BackColor = Color.FromArgb(35, 35, 35), ForeColor = Color.White, BorderStyle = BorderStyle.FixedSingle, TextAlign = HorizontalAlignment.Center };
-            // Выпадающий список выбора режима
+            lstBatchFiles = new ListBox
+            {
+                Location = new Point(25, 65),
+                Size = new Size(395, 300),
+                BackColor = Color.FromArgb(35, 35, 35),
+                ForeColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle,
+                Font = new Font("Segoe UI", 9),
+                AllowDrop = true
+            };
+
+            Label lblBatchShift = new Label
+            {
+                Text = "Ключ сдвига:",
+                ForeColor = Color.DarkGray,
+                Font = labelFont,
+                Location = new Point(25, 380),
+                AutoSize = true
+            };
+
+            numBatchShift = new NumericUpDown
+            {
+                Location = new Point(140, 378),
+                Width = 80,
+                Minimum = -25,
+                Maximum = 25,
+                Value = 3,
+                BackColor = Color.FromArgb(35, 35, 35),
+                ForeColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle,
+                TextAlign = HorizontalAlignment.Center
+            };
+
             cmbBatchMode = new ComboBox
             {
                 Location = new Point(235, 378),
@@ -105,8 +351,8 @@ namespace CaesarProject
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 9, FontStyle.Bold)
             };
-            cmbBatchMode.Items.AddRange(new string[] { "🔐 ЗАШИФРОВАТЬ", "🔓 РАСШИФРОВАТЬ" });
-            cmbBatchMode.SelectedIndex = 0; 
+            cmbBatchMode.Items.AddRange(new string[] { "🔒 ЗАШИФРОВАТЬ", "🔓 РАСШИФРОВАТЬ" });
+            cmbBatchMode.SelectedIndex = 0;
 
             btnAddBatch = CreateStyledButton("➕ ДОБАВИТЬ", new Point(25, 420), Color.FromArgb(100, 45, 140));
             btnAddBatch.Size = new Size(192, 45);
@@ -117,12 +363,22 @@ namespace CaesarProject
             btnProcessBatch = CreateStyledButton("🚀 НАЧАТЬ ОБРАБОТКУ", new Point(25, 480), Color.FromArgb(0, 110, 210));
             btnProcessBatch.Size = new Size(395, 60);
 
-            Label lblInfo = new Label { Text = "Файлы (txt/docx) будут перезаписаны новым текстом.", ForeColor = Color.Gray, Location = new Point(25, 550), AutoSize = true, Font = new Font("Segoe UI", 8) };
+            Label lblInfo = new Label
+            {
+                Text = "Файлы (txt/docx) будут перезаписаны новым текстом.",
+                ForeColor = Color.Gray,
+                Location = new Point(25, 550),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8)
+            };
 
-           tab2.Controls.AddRange(new Control[] { lblBatchTitle, lstBatchFiles, lblBatchShift, numBatchShift, cmbBatchMode, btnAddBatch, btnClearBatch, btnProcessBatch, lblInfo });
+            tab2.Controls.AddRange(new Control[]
+            {
+                lblBatchTitle, lstBatchFiles, lblBatchShift, numBatchShift,
+                cmbBatchMode, btnAddBatch, btnClearBatch, btnProcessBatch, lblInfo
+            });
 
-
-            // ВКЛАДКА 3
+            // ВКЛАДКА 3 
             Label HelpTitle = new Label
             {
                 Text = "СПРАВКА",
@@ -156,75 +412,84 @@ namespace CaesarProject
                     "• Добавьте файлы TXT/DOCX (или перетащите их в список).\r\n\r\n" +
                     "• Укажите ключ сдвига и нажмите «НАЧАТЬ ОБРАБОТКУ».\r\n\r\n" +
                     "• Внимание: содержимое файлов будет перезаписано!\r\n\r\n\r\n" +
-                    "💻 КОНСОЛЬНЫЙ РЕЖИМ\r\n" +
-                    "--------------------------------------\r\n" +
-                    "1. Открой PowerShell или cmd.\r\n\r\n" +
-                    "2. Укажи путь к программе:\r\n" +
-                    "   cd \"C:\\путь\\до\\папки\\с\\программой\"\r\n\r\n" +
-                    "3. Зашифровать текст:\r\n" +
-                    "   .\\CaesarProject.exe e 3 \"Hello\" -> Khoor\r\n\r\n" +
-                    "4. Расшифровать текст:\r\n" +
-                    "   .\\CaesarProject.exe d 3 \"Khoor\" -> Hello\r\n\r\n" +
-                    "5. Зашифровать файл (файл будет перезаписан):\r\n" +
-                    "   .\\CaesarProject.exe e 3 \"C:\\docs\\file.txt\"\r\n\r\n" +
-                    "6. Расшифровать файл:\r\n" +
-                    "   .\\CaesarProject.exe d 3 \"C:\\docs\\file.txt\"\r\n\r\n" +
-                    "e - зашифровать, d - расшифровать.\r\n\r\n\r\n" +
                     "ℹ️ О ШИФРЕ ЦЕЗАРЯ\r\n" +
                     "--------------------------------------\r\n" +
                     "Каждая буква заменяется буквой на N позиций дальше в алфавите.\r\n" +
                     "Поддерживаются латинский и русский алфавиты.\r\n" +
                     "Цифры и знаки препинания не изменяются.\r\n\r\n" +
-                    "Пример (сдвиг 3): А -> Г, B -> E, Hello -> Khoor"
+                    "Пример (сдвиг 3): A -> D, B -> E, Hello -> Khoor"
             };
 
             tab3.Controls.AddRange(new Control[] { HelpTitle, rtbHelp });
 
-            // СОБЫТИЯ
+            //  СОБЫТИЯ 
 
-            tab2.DragEnter += (s, e) => { if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effect = DragDropEffects.Copy; };
+            tab2.DragEnter += (s, e) =>
+            {
+                if (e.Data!.GetDataPresent(DataFormats.FileDrop))
+                    e.Effect = DragDropEffects.Copy;
+            };
             tab2.DragDrop += (s, e) => HandleFileDrop(e);
-            lstBatchFiles.DragEnter += (s, e) => { if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effect = DragDropEffects.Copy; };
+            lstBatchFiles.DragEnter += (s, e) =>
+            {
+                if (e.Data!.GetDataPresent(DataFormats.FileDrop))
+                    e.Effect = DragDropEffects.Copy;
+            };
             lstBatchFiles.DragDrop += (s, e) => HandleFileDrop(e);
 
+            // Зашифровать
             btnEncrypt.Click += (s, e) =>
             {
                 if (txtInput == null || string.IsNullOrWhiteSpace(txtInput.Text))
                 {
-                    MessageBox.Show("Введите текст для шифрования!", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("Введите текст для шифрования!", "Ошибка",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
                 if (numShift != null && numShift.Value == 0)
                 {
-                    MessageBox.Show("Сдвиг равен 0 — текст останется без изменений.", "Предупреждение", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show("Сдвиг равен 0 — текст останется без изменений.", "Предупреждение",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 try
                 {
                     if (txtOutput != null && numShift != null)
                         txtOutput.Text = CaesarCipher.Apply(txtInput.Text, (int)numShift.Value);
                 }
-                catch (Exception ex) { MessageBox.Show("Ошибка шифрования: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Ошибка шифрования: " + ex.Message, "Ошибка",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             };
 
+            // Расшифровать
             btnDecrypt.Click += (s, e) =>
             {
                 if (txtInput == null || string.IsNullOrWhiteSpace(txtInput.Text))
                 {
-                    MessageBox.Show("Введите текст для расшифровки!", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("Введите текст для расшифровки!", "Ошибка",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
                 if (numShift != null && numShift.Value == 0)
                 {
-                    MessageBox.Show("Сдвиг равен 0 — текст останется без изменений.", "Предупреждение", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show("Сдвиг равен 0 — текст останется без изменений.", "Предупреждение",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 try
                 {
                     if (txtOutput != null && numShift != null)
                         txtOutput.Text = CaesarCipher.Apply(txtInput.Text, -(int)numShift.Value);
                 }
-                catch (Exception ex) { MessageBox.Show("Ошибка расшифровки: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Ошибка расшифровки: " + ex.Message, "Ошибка",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             };
 
+            // Загрузить файл
             btnFileLoad.Click += (s, e) =>
             {
                 try
@@ -235,15 +500,18 @@ namespace CaesarProject
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Ошибка загрузки файла: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show("Ошибка загрузки файла: " + ex.Message, "Ошибка",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             };
 
+            // Сохранить файл
             btnFileSave.Click += (s, e) =>
             {
                 if (txtOutput == null || string.IsNullOrEmpty(txtOutput.Text))
                 {
-                    MessageBox.Show("Нет текста для сохранения!", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("Нет текста для сохранения!", "Ошибка",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
                 try
@@ -254,15 +522,18 @@ namespace CaesarProject
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Ошибка сохранения: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show("Ошибка сохранения: " + ex.Message, "Ошибка",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             };
 
+            // Копировать в буфер
             btnCopy.Click += (s, e) =>
             {
                 if (txtOutput == null || string.IsNullOrEmpty(txtOutput.Text))
                 {
-                    MessageBox.Show("Нет текста для копирования!", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("Нет текста для копирования!", "Ошибка",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
                 try
@@ -275,10 +546,12 @@ namespace CaesarProject
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Ошибка копирования: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show("Ошибка копирования: " + ex.Message, "Ошибка",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             };
 
+            // Добавить файлы в батч
             btnAddBatch.Click += (s, e) =>
             {
                 try
@@ -286,119 +559,79 @@ namespace CaesarProject
                     OpenFileDialog ofd = new OpenFileDialog { Filter = fileFilter, Multiselect = true };
                     if (ofd.ShowDialog() == DialogResult.OK && lstBatchFiles != null)
                         foreach (string f in ofd.FileNames)
-                            if (!lstBatchFiles.Items.Contains(f)) lstBatchFiles.Items.Add(f);
+                            if (!lstBatchFiles.Items.Contains(f))
+                                lstBatchFiles.Items.Add(f);
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Ошибка добавления файлов: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show("Ошибка добавления файлов: " + ex.Message, "Ошибка",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             };
 
+            // Очистить список
             btnClearBatch.Click += (s, e) => lstBatchFiles?.Items.Clear();
 
+            // Обработать батч
             btnProcessBatch.Click += (s, e) =>
             {
                 if (lstBatchFiles == null || lstBatchFiles.Items.Count == 0 || numBatchShift == null)
                 {
-                    MessageBox.Show("Выберите файлы для обработки!", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("Выберите файлы для обработки!", "Ошибка",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
+
                 var confirm = MessageBox.Show(
                     $"Файлы ({lstBatchFiles.Items.Count} шт.) будут перезаписаны. Продолжить?",
                     "Подтверждение",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning);
+
                 if (confirm != DialogResult.Yes) return;
 
-                try
+                int successCount = 0;
+                List<string> errors = new List<string>();
+
+                int shift = (int)numBatchShift.Value;
+                if (cmbBatchMode != null && cmbBatchMode.SelectedIndex == 1)
+                    shift = -shift;
+
+                foreach (string path in lstBatchFiles.Items)
                 {
-                    int shift = (int)numBatchShift.Value;
-                    if (cmbBatchMode != null && cmbBatchMode.SelectedIndex == 1) 
-                    {
-                        shift = -shift;
-                    }
-                    foreach (string path in lstBatchFiles.Items)
+                    try
                     {
                         string content = SmartRead(path);
                         SmartSave(path, CaesarCipher.Apply(content, shift));
+                        successCount++;
                     }
-
-                    MessageBox.Show($"Готово! Все файлы обработаны с шагом {shift}.");
-                    lstBatchFiles.Items.Clear();
+                    catch (Exception ex)
+                    {
+                        errors.Add($"{Path.GetFileName(path)}: {ex.Message}");
+                    }
                 }
-                catch (Exception ex) { MessageBox.Show("Ошибка обработки: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+
+                if (errors.Count == 0)
+                {
+                    MessageBox.Show($"Готово! Все файлы обработаны (сдвиг: {shift}).",
+                        "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    string errorList = string.Join("\n", errors);
+                    MessageBox.Show(
+                        $"Обработано успешно: {successCount}\nОшибки ({errors.Count}):\n{errorList}",
+                        "Частичная ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+
+                lstBatchFiles.Items.Clear();
             };
 
+            // Очистить поля
             btnClear.Click += (s, e) =>
             {
                 if (txtInput != null) txtInput.Text = "";
                 if (txtOutput != null) txtOutput.Text = "";
-            };
-        }
-
-        private string SmartRead(string path)
-        {
-            string ext = Path.GetExtension(path).ToLower();
-            if (ext == ".docx")
-            {
-                using (DocX doc = DocX.Load(path))
-                {
-                    StringBuilder sb = new StringBuilder();
-                    foreach (var para in doc.Paragraphs)
-                        sb.AppendLine(para.Text);
-                    return sb.ToString();
-                }
-            }
-            return File.ReadAllText(path, Encoding.UTF8);
-        }
-
-        private void SmartSave(string path, string content)
-        {
-            string ext = Path.GetExtension(path).ToLower();
-            if (ext == ".docx")
-            {
-                using (DocX doc = DocX.Create(path))
-                {
-                    string[] lines = content.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-                    foreach (string line in lines)
-                    {
-                        var para = doc.InsertParagraph(line);
-                        if (line.StartsWith("\t"))
-                            para.IndentationFirstLine = 1f;
-                    }
-                    doc.Save();
-                }
-            }
-            else
-            {
-                File.WriteAllText(path, content, Encoding.UTF8);
-            }
-        }
-
-        private void HandleFileDrop(DragEventArgs e)
-        {
-            if (lstBatchFiles == null) return;
-            string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
-            foreach (string f in files)
-            {
-                string ext = Path.GetExtension(f).ToLower();
-                if ((ext == ".txt" || ext == ".docx") && !lstBatchFiles.Items.Contains(f))
-                    lstBatchFiles.Items.Add(f);
-            }
-        }
-
-        private Button CreateStyledButton(string text, Point location, Color bgColor)
-        {
-            return new Button
-            {
-                Text = text,
-                Location = location,
-                Size = new Size(190, 45),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = bgColor,
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 9, FontStyle.Bold),
-                Cursor = Cursors.Hand
             };
         }
     }
